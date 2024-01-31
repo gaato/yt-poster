@@ -1,2 +1,2 @@
 # yt-poster
-Posts what I'm watching on YouTube to X
+Posts what I'm watching on YouTube to X. (personal use)
