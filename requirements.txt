@@ -47,6 +47,8 @@ idna==3.6
     # via
     #   requests
     #   yarl
+misskey-py==4.1.0
+    # via -r requirements.in
 multidict==6.0.4
     # via
     #   aiohttp
@@ -81,6 +83,7 @@ requests==2.31.0
     # via
     #   -r requirements.in
     #   google-api-core
+    #   misskey-py
     #   requests-oauthlib
     #   tweepy
 requests-oauthlib==1.3.1

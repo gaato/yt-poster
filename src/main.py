@@ -4,6 +4,7 @@ from typing import Optional
 
 import discord
 import dotenv
+from misskey import Misskey
 
 from twitter import TwitterPoster
 from youtube import YouTubeDataFetcher
@@ -13,6 +14,7 @@ dotenv.load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 bot = discord.Bot(intents=intents)
+mk = Misskey(os.environ["MISSKEY_HOST"], os.environ["MISSKEY_TOKEN"])
 
 CHANNEL_ID = int(os.environ["CHANNEL_ID"])
 
@@ -67,12 +69,27 @@ async def on_message(message: discord.Message):
     )[0]
     thumbnail_url = youtube_data_fetcher.get_thumbnail_url(video_details["id"])
     media_id = twitter_poster.media_upload(thumbnail_url)
-    twitter_poster.post_tweet(
-        f"Now I'm watching...\n\n"
-        f"{video_details['snippet']['title']}\n"
-        f"{youtube_url}",
-        media_ids=[media_id],
-    )
+    try:
+        twitter_poster.post_tweet(
+            f"Now I'm watching...\n\n"
+            f"{video_details['snippet']['title']}\n"
+            f"{youtube_url}",
+            media_ids=[media_id],
+        )
+    except Exception as e:
+        print(e)
+        await message.channel.send("Failed to post tweet.")
+        return
+    try:
+        mk.notes_create(
+            text=f"Now I'm watching...\n\n"
+            f"{video_details['snippet']['title']}\n"
+            f"{youtube_url}",
+        )
+    except Exception as e:
+        print(e)
+        await message.channel.send("Failed to post note.")
+        return
 
 
 bot.run(os.environ["DISCORD_BOT_TOKEN"])

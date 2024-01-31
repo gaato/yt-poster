@@ -3,3 +3,4 @@ python-dotenv
 tweepy>=4.14.0
 google-api-python-client
 requests
+Misskey.py
