@@ -73,27 +73,27 @@ async def on_message(message: discord.Message):
     )[0]
     thumbnail_url = youtube_data_fetcher.get_thumbnail_url(video_details["id"])
     media_id = twitter_poster.media_upload(thumbnail_url)
-    # try:
-    #     twitter_poster.post_tweet(
-    #         f"Now I'm watching...\n\n"
-    #         f"{video_details['snippet']['title']}\n"
-    #         f"{youtube_url}",
-    #         media_ids=[media_id],
-    #     )
-    # except Exception as e:
-    #     print(e)
-    #     await message.channel.send("Failed to post tweet.")
-    #     return
-    # try:
-    #     misskey_client.notes_create(
-    #         text=f"Now I'm watching...\n\n"
-    #         f"{video_details['snippet']['title']}\n"
-    #         f"{youtube_url}",
-    #     )
-    # except Exception as e:
-    #     print(e)
-    #     await message.channel.send("Failed to post note.")
-    #     return
+    try:
+        twitter_poster.post_tweet(
+            f"Now I'm watching...\n\n"
+            f"{video_details['snippet']['title']}\n"
+            f"{youtube_url}",
+            media_ids=[media_id],
+        )
+    except Exception as e:
+        print(e)
+        await message.channel.send("Failed to post tweet.")
+        return
+    try:
+        misskey_client.notes_create(
+            text=f"Now I'm watching...\n\n"
+            f"{video_details['snippet']['title']}\n"
+            f"{youtube_url}",
+        )
+    except Exception as e:
+        print(e)
+        await message.channel.send("Failed to post note.")
+        return
     try:
         with requests.get(thumbnail_url) as r:
             r.raise_for_status()
