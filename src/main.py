@@ -2,6 +2,7 @@ import os
 import re
 from typing import Optional
 
+import atproto
 import discord
 import dotenv
 from misskey import Misskey
@@ -14,7 +15,9 @@ dotenv.load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 bot = discord.Bot(intents=intents)
-mk = Misskey(os.environ["MISSKEY_HOST"], os.environ["MISSKEY_TOKEN"])
+misskey_client = Misskey(os.environ["MISSKEY_HOST"], os.environ["MISSKEY_TOKEN"])
+bluesky_client = atproto.Client()
+bluesky_client.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 
 CHANNEL_ID = int(os.environ["CHANNEL_ID"])
 
@@ -81,7 +84,7 @@ async def on_message(message: discord.Message):
         await message.channel.send("Failed to post tweet.")
         return
     try:
-        mk.notes_create(
+        misskey_client.notes_create(
             text=f"Now I'm watching...\n\n"
             f"{video_details['snippet']['title']}\n"
             f"{youtube_url}",
@@ -89,6 +92,24 @@ async def on_message(message: discord.Message):
     except Exception as e:
         print(e)
         await message.channel.send("Failed to post note.")
+        return
+    try:
+        bluesky_text = (
+            atproto.client_utils.TextBuilder()
+            .text(f"Now I'm watching...\n\n")
+            .link(video_details["snippet"]["title"], youtube_url)
+        )
+        embed = atproto.models.AppBskyEmbedExternal.Main(
+            external=atproto.models.AppBskyEmbedExternal.External(
+                title=video_details["snippet"]["title"],
+                description=video_details["snippet"]["description"],
+                uri=youtube_url,
+            )
+        )
+        bluesky_client.post(bluesky_text, embed=embed)
+    except Exception as e:
+        print(e)
+        await message.channel.send("Failed to post to Bluesky.")
         return
 
 
