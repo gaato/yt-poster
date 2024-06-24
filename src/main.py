@@ -74,7 +74,7 @@ async def on_message(message: discord.Message):
     )[0]
     thumbnail_url = youtube_data_fetcher.get_thumbnail_url(video_details["id"])
     media_id = twitter_poster.media_upload(thumbnail_url)
-    video_title = re.sub(r"@(\w+)", r"@\u200B\1", video_details["snippet"]["title"])
+    video_title = re.sub(r"@(\w+)", "@\u200b" r"\1", video_details["snippet"]["title"])
     try:
         twitter_poster.post_tweet(
             f"Now I'm watching...\n\n" f"{video_title}\n" f"{youtube_url}",
