@@ -5,6 +5,8 @@ from typing import Optional
 import requests
 import tweepy
 
+logger = logging.getLogger(__name__)
+
 
 class TwitterPoster:
     def __init__(
@@ -33,25 +35,40 @@ class TwitterPoster:
                 access_token=access_token,
                 access_token_secret=access_token_secret,
             )
+            logger.info("TwitterPoster initialized successfully")
         except Exception as e:
-            logging.error(e)
+            logger.error(f"Failed to initialize TwitterPoster: {e}")
             raise e
 
-    def media_upload(self, url: str) -> str:
-        with requests.get(url) as r:
-            if r.status_code != 200:
-                logging.error(f"Failed to download {url}")
-                return None
-            file = io.BytesIO(r.content)
-            filename = url.split("/")[-1]
+    def media_upload(self, url: str) -> Optional[str]:
+        """
+        Uploads media from URL to Twitter.
+        
+        Args:
+            url: URL of the media to upload
+            
+        Returns:
+            Media ID if successful, None otherwise
+        """
+        try:
+            with requests.get(url, timeout=30) as r:
+                r.raise_for_status()
+                file = io.BytesIO(r.content)
+                filename = url.split("/")[-1]
 
-        return self.api.media_upload(file=file, filename=filename).media_id
+            media = self.api.media_upload(file=file, filename=filename)
+            logger.info(f"Media uploaded successfully: {media.media_id}")
+            return media.media_id
+            
+        except Exception as e:
+            logger.error(f"Failed to upload media from {url}: {e}")
+            return None
 
     def post_tweet(
         self,
         text: str,
         media_ids: list[str] = [],
-        reply_to: str | int = None,
+        reply_to: Optional[str | int] = None,
     ) -> Optional[tweepy.Response]:
         """
         Posts a tweet with specified text and media IDs.
@@ -62,15 +79,20 @@ class TwitterPoster:
             reply_to: The ID of the tweet to reply to.
 
         Returns:
-            True if the tweet was posted successfully, False otherwise.
+            Tweet response if successful, None otherwise.
         """
         try:
+            # Filter out None media IDs
+            valid_media_ids = [mid for mid in media_ids if mid is not None]
+            
             result = self.client.create_tweet(
-                text=text, media_ids=media_ids, in_reply_to_tweet_id=reply_to
+                text=text, 
+                media_ids=valid_media_ids if valid_media_ids else None,
+                in_reply_to_tweet_id=reply_to
             )
-        except Exception as e:
-            logging.error(e)
-            return None
-        else:
-            logging.info(f"Tweeted: {text}")
+            logger.info(f"Tweet posted successfully: {text[:50]}...")
             return result
+            
+        except Exception as e:
+            logger.error(f"Failed to post tweet: {e}")
+            return None

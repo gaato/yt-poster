@@ -1,0 +1,13 @@
+[project]
+name = "yt-poster"
+version = "0.1.0"
+description = "Posts what I'm watching on YouTube to Twitter"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "py-cord>=2.4.1,<3.0.0",
+    "python-dotenv",
+    "tweepy>=4.14.0",
+    "google-api-python-client",
+    "requests",
+]

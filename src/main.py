@@ -1,24 +1,26 @@
 import os
 import re
 from typing import Optional
+import logging
 
-import atproto
 import discord
 import dotenv
-import requests
-from misskey import Misskey
 
 from twitter import TwitterPoster
 from youtube import YouTubeDataFetcher
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 dotenv.load_dotenv()
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = discord.Bot(intents=intents)
-misskey_client = Misskey(os.environ["MISSKEY_HOST"], os.environ["MISSKEY_TOKEN"])
-bluesky_client = atproto.Client()
-bluesky_client.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 
 CHANNEL_ID = int(os.environ["CHANNEL_ID"])
 
@@ -52,7 +54,7 @@ def convert_youtube_url(url: str) -> Optional[str]:
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user.name} ({bot.user.id})")
+    logger.info(f"Logged in as {bot.user.name} ({bot.user.id})")
 
 
 @bot.event
@@ -62,59 +64,37 @@ async def on_message(message: discord.Message):
     if message.channel.id != CHANNEL_ID:
         return
 
-    print(f"{message.author.name}: {message.content}")
+    logger.info(f"{message.author.name}: {message.content}")
     youtube_url = convert_youtube_url(message.content)
     if youtube_url is None:
         return
 
     await message.channel.send(youtube_url)
 
-    video_details = youtube_data_fetcher.get_video_details(
-        [youtube_url.split("/")[-1]]
-    )[0]
-    thumbnail_url = youtube_data_fetcher.get_thumbnail_url(video_details["id"])
-    media_id = twitter_poster.media_upload(thumbnail_url)
-    video_title = re.sub(r"@(\w+)", "@\u200b" r"\1", video_details["snippet"]["title"])
     try:
-        twitter_poster.post_tweet(
-            f"Now I'm watching...\n\n" f"{video_title}\n" f"{youtube_url}",
+        video_details = youtube_data_fetcher.get_video_details(
+            [youtube_url.split("/")[-1]]
+        )[0]
+        thumbnail_url = youtube_data_fetcher.get_thumbnail_url(video_details["id"])
+        media_id = twitter_poster.media_upload(thumbnail_url)
+        
+        # Escape @ mentions to prevent unwanted mentions
+        video_title = re.sub(r"@(\w+)", "@\u200b" r"\1", video_details["snippet"]["title"])
+        
+        result = twitter_poster.post_tweet(
+            f"Now I'm watching...\n\n{video_title}\n{youtube_url}",
             media_ids=[media_id],
         )
+        
+        if result:
+            logger.info("Successfully posted to Twitter")
+        else:
+            await message.channel.send("Failed to post tweet.")
+            
     except Exception as e:
-        print(e)
+        logger.error(f"Error posting to Twitter: {e}")
         await message.channel.send("Failed to post tweet.")
-        return
-    # try:
-    #     misskey_client.notes_create(
-    #         text=f"Now I'm watching...\n\n"
-    #         f"{video_details['snippet']['title']}\n"
-    #         f"{youtube_url}",
-    #     )
-    # except Exception as e:
-    #     print(e)
-    #     await message.channel.send("Failed to post note.")
-    #     return
-    # try:
-    #     with requests.get(thumbnail_url) as r:
-    #         r.raise_for_status()
-    #         file = r.content
-    #     thumb_response = bluesky_client.upload_blob(file)
-    #     embed = atproto.models.AppBskyEmbedExternal.Main(
-    #         external=atproto.models.AppBskyEmbedExternal.External(
-    #             title=video_details["snippet"]["title"],
-    #             description=video_details["snippet"]["description"],
-    #             uri=youtube_url,
-    #             thumb=thumb_response.blob,
-    #         )
-    #     )
-    #     bluesky_client.post(
-    #         text=f"Now I'm watching...\n\n{video_details['snippet']['title']}",
-    #         embed=embed,
-    #     )
-    except Exception as e:
-        print(e)
-        await message.channel.send("Failed to post to Bluesky.")
-        return
 
 
-bot.run(os.environ["DISCORD_BOT_TOKEN"])
+if __name__ == "__main__":
+    bot.run(os.environ["DISCORD_BOT_TOKEN"])

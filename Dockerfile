@@ -1,9 +1,17 @@
 FROM python:3.11-alpine
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
 WORKDIR /app
-COPY ./requirements.txt /app/requirements.txt
-RUN pip install -r requirements.txt
+
+# Copy project files
+COPY ./pyproject.toml /app/pyproject.toml
+COPY ./uv.lock* /app/
+
+# Install dependencies
+RUN uv sync --frozen
 
 COPY ./src /app
 
-ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["uv", "run", "python", "main.py"]
