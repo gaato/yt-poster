@@ -25,7 +25,7 @@ export function startHttpServer(config: Config, poster: PosterService): Deno.Htt
 
       if (request.method === "GET" && url.pathname === "/auth/x/start") {
         const accountId = url.searchParams.get("account") ?? undefined;
-        const returnTo = url.searchParams.get("return_to") ?? undefined;
+        const returnTo = safeReturnTo(url.searchParams.get("return_to"));
         const redirect = await poster.createXAuthorizationUrl(accountId, returnTo);
         return Response.redirect(redirect, 302);
       }
@@ -37,15 +37,7 @@ export function startHttpServer(config: Config, poster: PosterService): Deno.Htt
           return json({ error: "missing code or state" }, 400);
         }
         const completion = await poster.completeXAuthorization(code, state);
-        if (completion.returnTo) {
-          return Response.redirect(new URL(completion.returnTo, url), 303);
-        }
-        return html(
-          `Authorized X account ${
-            escapeHtml(completion.account.username ?? completion.account.id)
-          }. ` +
-            `<a href="/">Return to yt-poster</a>`,
-        );
+        return redirectAfterAuthorization(new URL(safeReturnTo(completion.returnTo), url), config);
       }
 
       if (request.method === "GET" && url.pathname === "/settings") {
@@ -158,15 +150,34 @@ function redirectWithSessionCookie(url: URL, config: Config): Response {
     status: 303,
     headers: {
       location: redirectUrl.toString(),
-      "set-cookie": [
-        `yt_poster_token=${encodeURIComponent(config.webhookToken)}`,
-        "Path=/",
-        "HttpOnly",
-        "SameSite=Lax",
-        "Max-Age=31536000",
-      ].join("; "),
+      "set-cookie": sessionCookie(config.webhookToken),
     },
   });
+}
+
+function redirectAfterAuthorization(url: URL, config: Config): Response {
+  const headers = new Headers({ location: url.toString() });
+  if (config.webhookToken) {
+    headers.set("set-cookie", sessionCookie(config.webhookToken));
+  }
+  return new Response(null, { status: 303, headers });
+}
+
+function sessionCookie(token: string): string {
+  return [
+    `yt_poster_token=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=31536000",
+  ].join("; ");
+}
+
+function safeReturnTo(value: string | undefined | null): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+  return value;
 }
 
 function minimalDocument(body: string): string {
@@ -200,6 +211,7 @@ function parseCookies(value: string | null): Record<string, string> {
 function renderHomePage(poster: PosterService): string {
   const account = poster.accounts.getDefaultAccount();
   const accountLabel = account?.username ? `@${account.username}` : account?.id ?? "not connected";
+  const accountHref = account ? "/settings" : "/auth/x/start?return_to=/";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -233,7 +245,7 @@ function renderHomePage(poster: PosterService): string {
   <main>
     <header>
       <h1>yt-poster</h1>
-      <a href="/settings">${escapeHtml(accountLabel)}</a>
+      <a href="${accountHref}">${escapeHtml(accountLabel)}</a>
     </header>
     <form id="post-form">
       <input id="url-input" name="url" autocomplete="off" autofocus placeholder="Paste a YouTube URL and press Enter">
@@ -272,7 +284,9 @@ function renderHomePage(poster: PosterService): string {
       });
       const body = await response.json();
       if (!response.ok) {
-        status.textContent = body.error ?? "Post failed";
+        status.textContent = body.error === "unauthorized"
+          ? "Reconnect X, then try posting again."
+          : body.error ?? "Post failed";
         button.disabled = false;
         return;
       }
