@@ -211,7 +211,7 @@ function parseCookies(value: string | null): Record<string, string> {
 function renderHomePage(poster: PosterService): string {
   const account = poster.accounts.getDefaultAccount();
   const accountLabel = account?.username ? `@${account.username}` : account?.id ?? "not connected";
-  const accountHref = account ? "/settings" : "/auth/x/start?return_to=/";
+  const accountHref = "/auth/x/start?return_to=/";
   return `<!doctype html>
 <html lang="en">
 <head>
