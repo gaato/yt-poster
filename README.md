@@ -1,96 +1,72 @@
 # yt-poster
 
-Posts what I'm watching on YouTube to Twitter/X. (personal use)
+Private Deno/TypeScript app that posts a YouTube stream or video to X with the video thumbnail
+attached.
 
-## Features
+## Shape
 
-- Discord bot that monitors YouTube URLs in a specific channel
-- Automatically posts to Twitter/X with video thumbnail
-- Converts various YouTube URL formats to the short format
-- Escapes @ mentions to prevent unwanted notifications
+- Browser-first paste-to-post UI with realtime preview
+- Discord `/watch url:` slash command as a secondary ingress
+- HTTP webhook for automation and Shortcuts
+- X OAuth 2.0 PKCE
+- YouTube Data API metadata lookup
+- SQLite state for X tokens, share drafts, and post history
+- LAN HTTPS deployment behind Traefik at `yt-poster.home.gaato.net`
 
-## Setup
+## Development
 
-### Prerequisites
-
-- Python 3.11+
-- uv (Python package manager)
-- Discord Bot Token
-- Twitter API credentials
-- YouTube Data API key
-
-### Installation
-
-1. Install uv if you haven't already:
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+deno task check
+deno task test
+deno task dev
 ```
 
-2. Clone the repository and install dependencies:
-```bash
-git clone <repo-url>
-cd yt-poster
-uv sync
-```
+Create `.env` or export the required variables:
 
-3. Create a `.env` file with your credentials:
 ```env
-DISCORD_BOT_TOKEN=your_discord_bot_token
-CHANNEL_ID=your_discord_channel_id
-TWITTER_CONSUMER_KEY=your_twitter_consumer_key
-TWITTER_CONSUMER_SECRET=your_twitter_consumer_secret
-TWITTER_ACCESS_TOKEN=your_twitter_access_token
-TWITTER_ACCESS_TOKEN_SECRET=your_twitter_access_token_secret
-YOUTUBE_API_KEY=your_youtube_api_key
+YT_POSTER_BASE_URL=http://127.0.0.1:8080
+YT_POSTER_DATABASE_PATH=./data/yt-poster.sqlite
+YOUTUBE_API_KEY=...
+X_CLIENT_ID=...
+X_CLIENT_SECRET=
+DISCORD_BOT_TOKEN=...
+DISCORD_GUILD_ID=
+WEBHOOK_TOKEN=...
 ```
 
-### Running
+Start X authorization by opening:
 
-Local development:
+```text
+http://127.0.0.1:8080/auth/x/start
+```
+
+Use the browser UI:
+
+```text
+http://127.0.0.1:8080/?token=<WEBHOOK_TOKEN>
+```
+
+The token parameter sets a local session cookie for posting mutations. Paste a YouTube URL into the
+input; the page fetches a preview and posts when you press Enter or the Post button.
+
+Post through the webhook:
+
 ```bash
-# Using uv directly
-uv run python src/main.py
-
-# Or using the convenience script
-uv run python run.py
-
-# Or using Make
-make run
-make dev
+curl -H "Authorization: Bearer $WEBHOOK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://youtu.be/dQw4w9WgXcQ"}' \
+  http://127.0.0.1:8080/watch
 ```
 
-Docker:
-```bash
-# Manual
-docker-compose up --build
+On Rock 5 ITX, configure X OAuth with this callback URL:
 
-# Or using Make
-make build
-make start
+```text
+https://yt-poster.home.gaato.net/auth/x/callback
 ```
 
-### Available Make Commands
+The container listens on `127.0.0.1:8084` through rootless Quadlet, and Traefik publishes
+`https://yt-poster.home.gaato.net`.
 
-- `make install` - Install dependencies
-- `make run` - Run the application locally
-- `make dev` - Run using the convenience script
-- `make build` - Build Docker image
-- `make start` - Start with Docker
-- `make start-bg` - Start with Docker in background
-- `make stop` - Stop Docker containers
-- `make logs` - Show Docker logs
-- `make check` - Check code syntax
-- `make clean` - Clean up Docker and cache
-- `make update` - Update dependencies
+## License
 
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `DISCORD_BOT_TOKEN` | Your Discord bot token |
-| `CHANNEL_ID` | Discord channel ID to monitor |
-| `TWITTER_CONSUMER_KEY` | Twitter API consumer key |
-| `TWITTER_CONSUMER_SECRET` | Twitter API consumer secret |
-| `TWITTER_ACCESS_TOKEN` | Twitter API access token |
-| `TWITTER_ACCESS_TOKEN_SECRET` | Twitter API access token secret |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 key |
+BlueOak-1.0.0

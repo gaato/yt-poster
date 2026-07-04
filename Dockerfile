@@ -1,17 +1,17 @@
-FROM python:3.11-alpine
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+FROM docker.io/denoland/deno:alpine-2.9.1
 
 WORKDIR /app
 
-# Copy project files
-COPY ./pyproject.toml /app/pyproject.toml
-COPY ./uv.lock* /app/
+COPY deno.json deno.lock* ./
+COPY src ./src
 
-# Install dependencies
-RUN uv sync --frozen
+RUN deno cache --node-modules-dir=auto src/main.ts
 
-COPY ./src /app
+ENV YT_POSTER_HOST=0.0.0.0
+ENV YT_POSTER_PORT=8080
+ENV YT_POSTER_DATABASE_PATH=/data/yt-poster/yt-poster.sqlite
 
-ENTRYPOINT ["uv", "run", "python", "main.py"]
+VOLUME ["/data/yt-poster"]
+EXPOSE 8080
+
+CMD ["run", "--allow-env", "--allow-net", "--allow-read", "--allow-write", "--allow-sys", "src/main.ts"]
