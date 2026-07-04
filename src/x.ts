@@ -68,14 +68,18 @@ export class XService {
   }): Promise<{ media: UploadedMedia; post: CreatedPost }> {
     const account = await this.getFreshAccount(input.accountId);
     const client = new TwitterApi(account.accessToken);
-    const media = await this.uploadThumbnail(client, input.thumbnailUrl);
-    const post = parseCreatedPost(
-      await client.v2.tweet({
-        text: input.text,
-        media: { media_ids: [media.mediaId] },
-      }),
-    );
-    return { media, post };
+    try {
+      const media = await this.uploadThumbnail(client, input.thumbnailUrl);
+      const post = parseCreatedPost(
+        await client.v2.tweet({
+          text: input.text,
+          media: { media_ids: [media.mediaId] },
+        }),
+      );
+      return { media, post };
+    } catch (error) {
+      throw normalizeXApiError(error);
+    }
   }
 
   async uploadThumbnailAndPost(
@@ -198,3 +202,17 @@ async function fetchProfile(client: TwitterApiReadWrite): Promise<{
 }
 
 export type XOAuthRequest = IOAuth2RequestTokenResult;
+
+function normalizeXApiError(error: unknown): Error {
+  if (isRecord(error) && error.code === 402 && isRecord(error.data)) {
+    const title = typeof error.data.title === "string" ? error.data.title : undefined;
+    if (title === "CreditsDepleted") {
+      return new Error("X API credits are depleted for this developer account.");
+    }
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
