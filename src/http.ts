@@ -211,7 +211,15 @@ function parseCookies(value: string | null): Record<string, string> {
 function renderHomePage(poster: PosterService): string {
   const account = poster.accounts.getDefaultAccount();
   const accountLabel = account?.username ? `@${account.username}` : account?.id ?? "not connected";
-  const accountHref = "/auth/x/start?return_to=/";
+  const connectLabel = account ? "Reconnect X" : "Connect X";
+  const accountStatus = account
+    ? `Connected as ${escapeHtml(account.username ? `@${account.username}` : account.id)}`
+    : "Not connected";
+  const disconnectAction = account
+    ? `<form class="account-menu-form" method="post" action="/settings/x/disconnect">
+        <button class="menu-action danger" type="submit">Disconnect</button>
+      </form>`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -225,6 +233,16 @@ function renderHomePage(poster: PosterService): string {
     header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     h1 { font-size: 24px; margin: 0 0 24px; letter-spacing: 0; }
     a { color: LinkText; }
+    .account-trigger { padding: 8px 10px; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 8px; background: Canvas; color: CanvasText; }
+    .account-trigger::after { content: "⌄"; padding-left: 6px; color: color-mix(in srgb, CanvasText 58%, transparent); }
+    .account-menu { width: min(260px, calc(100vw - 32px)); margin: 0; padding: 8px; inset: 84px max(16px, calc((100vw - 760px) / 2)) auto auto; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 8px; background: Canvas; color: CanvasText; box-shadow: 0 16px 44px color-mix(in srgb, CanvasText 16%, transparent); }
+    .account-menu::backdrop { background: transparent; }
+    .account-status { padding: 8px 10px 10px; font-size: 13px; color: color-mix(in srgb, CanvasText 68%, transparent); }
+    .menu-actions { display: grid; gap: 2px; }
+    .menu-action { display: block; width: 100%; box-sizing: border-box; padding: 10px; border: 0; border-radius: 6px; background: transparent; color: CanvasText; text-align: left; text-decoration: none; font: inherit; }
+    .menu-action:hover, .menu-action:focus-visible { background: color-mix(in srgb, CanvasText 9%, Canvas); outline: none; }
+    .menu-action.danger { color: #dc2626; }
+    .account-menu-form { display: block; margin: 0; }
     form { display: grid; gap: 12px; }
     input { font: inherit; font-size: 18px; padding: 14px 16px; border: 1px solid color-mix(in srgb, CanvasText 25%, transparent); border-radius: 8px; background: Canvas; color: CanvasText; }
     button { font: inherit; padding: 12px 16px; border: 0; border-radius: 8px; background: #1d9bf0; color: white; cursor: pointer; }
@@ -245,8 +263,18 @@ function renderHomePage(poster: PosterService): string {
   <main>
     <header>
       <h1>yt-poster</h1>
-      <a href="${accountHref}">${escapeHtml(accountLabel)}</a>
+      <button class="account-trigger" id="account-trigger" type="button" popovertarget="account-menu" aria-haspopup="true" aria-expanded="false" data-fallback-href="/settings">${
+    escapeHtml(accountLabel)
+  }</button>
     </header>
+    <div class="account-menu" id="account-menu" popover aria-labelledby="account-trigger">
+      <div class="account-status">${accountStatus}</div>
+      <div class="menu-actions">
+        <a class="menu-action" href="/auth/x/start?return_to=/">${connectLabel}</a>
+        <a class="menu-action" href="/settings">Settings</a>
+        ${disconnectAction}
+      </div>
+    </div>
     <form id="post-form">
       <input id="url-input" name="url" autocomplete="off" autofocus placeholder="Paste a YouTube URL and press Enter">
       <button id="post-button" type="submit" disabled>Post</button>
@@ -262,6 +290,8 @@ function renderHomePage(poster: PosterService): string {
     const status = document.querySelector("#status");
     const preview = document.querySelector("#preview");
     const result = document.querySelector("#result");
+    const accountTrigger = document.querySelector("#account-trigger");
+    const accountMenu = document.querySelector("#account-menu");
     let timer = 0;
     let draft = null;
     const params = new URLSearchParams(location.search);
@@ -269,6 +299,14 @@ function renderHomePage(poster: PosterService): string {
       input.value = params.get("url");
       queuePreview(0);
     }
+    if (!("popover" in HTMLElement.prototype) && accountTrigger) {
+      accountTrigger.addEventListener("click", () => {
+        location.href = accountTrigger.dataset.fallbackHref ?? "/settings";
+      });
+    }
+    accountMenu?.addEventListener("toggle", (event) => {
+      accountTrigger?.setAttribute("aria-expanded", event.newState === "open" ? "true" : "false");
+    });
     input.addEventListener("input", () => queuePreview(300));
     input.addEventListener("paste", () => queuePreview(0));
     form.addEventListener("submit", async (event) => {
